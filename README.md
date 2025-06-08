@@ -17,6 +17,7 @@ Com base nos commits e na estrutura de arquivos, este repositório oferece recur
 ## 💻 Tecnologias Utilizadas
 
 A linguagem predominante e exclusiva neste projeto é **Shell (100.0%)**.
+Sripts aplicáveis em Instâncis GitLab instaladas em **Ubuntu e Kubernetes (Rancher ou Openshift)**.
 
 ## 📊 Status do Repositório
 
