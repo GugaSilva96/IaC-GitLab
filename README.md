@@ -11,8 +11,8 @@ Com base nos commits e na estrutura de arquivos, este repositório oferece recur
 
 *   **Upgrade de GitLab em Kubernetes**: Contém scripts e configurações projetados para auxiliar na atualização de instâncias do GitLab implantadas em ambientes Kubernetes.
 *   **Upgrade de GitLab em Ubuntu**: Inclui recursos para facilitar a atualização de instalações do GitLab em servidores que operam com o sistema operacional Ubuntu.
-*   **Nova Instância GitLab (v14.0.5 YAML)**: Provavelmente dispõe de configurações e scripts, possivelmente em formato YAML, para a criação de novas instâncias do GitLab na versão 14.0.5.
-*   **Vídeos (Guia de Uso)**: Há um indicativo de que o repositório pode conter ou referenciar guias em vídeo para o uso de suas funcionalidades e scripts.
+*   **Nova Instância GitLab (v14.0.5 YAML)**: Dispõe de configurações e scripts, possivelmente em formato YAML, para a criação de novas instâncias do GitLab na versão 14.0.5.
+*   **Vídeos (Guia de Uso)**: Guias em vídeo para o uso de suas funcionalidades e scripts.
 
 ## 💻 Tecnologias Utilizadas
 
