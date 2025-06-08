@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  namespace: gitlab-upgrade
+  labels:
+    app: gitlab
+    component: scm
+    tier: backend
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+  selector:
+    matchLabels:
+      app: gitlab
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: gitlab
+        component: scm
+        tier: backend
+      annotations:
+        prometheus.io/path: /-/metrics
+        prometheus.io/port: "80"
+        prometheus.io/scrape: "true"
+    spec:
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: false
+      volumes:
+        - name: gitlab-data
+          persistentVolumeClaim:
+            claimName: gitlab-data
+        - name: gitlab-config
+          persistentVolumeClaim:
+            claimName: gitlab-config
+        - name: gitlab-logs
+          persistentVolumeClaim:
+            claimName: gitlab-logs
+        - name: gitlab-config-cm
+          configMap:
+            name: gitlab-cm
+            defaultMode: 288
+      initContainers:
+        - name: copy-config
+          image: busybox:stable
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "cp /extras/gitlab.rb /etc/gitlab/gitlab.rb"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 1000
+          volumeMounts:
+            - name: gitlab-config-cm
+              mountPath: /extras/gitlab.rb
+              subPath: gitlab.rb
+              readOnly: true
+            - name: gitlab-config
+              mountPath: /etc/gitlab
+      containers:
+        - name: gitlab-ce
+          image: gitlab/gitlab-ce:14.10.5-ce.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GITLAB_OMNIBUS_CONFIG
+              valueFrom:
+                configMapKeyRef:
+                  name: gitlab-cm
+                  key: gitlab.rb
+            - name: TZ
+              value: UTC
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+            - containerPort: 22
+              name: ssh
+              protocol: TCP
+            - containerPort: 443
+              name: https
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "2"
+              memory: 5Gi
+            limits:
+              cpu: "4"
+              memory: 10Gi
+          volumeMounts:
+            - name: gitlab-data
+              mountPath: /var/opt/gitlab
+            - name: gitlab-config
+              mountPath: /etc/gitlab/
+              subPath: gitlab.rb
+            - name: gitlab-logs
+              mountPath: /var/log/gitlab
