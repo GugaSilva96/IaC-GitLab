@@ -146,20 +146,49 @@ backup_gitlab() {
   return 0
 }
 
+delete_replicaset() {
+  local rs=$1
+  log "Deletando ReplicaSet: $rs"
+  kubectl delete rs "$rs" -n "$NAMESPACE" --grace-period=0 --force || \
+    log "Erro ao deletar ReplicaSet $rs"
+}
+
+get_current_rs_hash() {
+  kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.template.metadata.labels.pod-template-hash}'
+}
+
+get_old_replicasets() {
+  local current_hash=$1
+  kubectl get rs -n "$NAMESPACE" -l app="$DEPLOYMENT_NAME" -o json | \
+    jq -r --arg current "$current_hash" '.items[] | select(.metadata.labels."pod-template-hash" != $current) | .metadata.name'
+}
+
+cleanup_old_replicasets() {
+  log "Verificando e removendo ReplicaSets antigos..."
+
+  local current_rs_hash=$(get_current_rs_hash)
+  log "Hash atual do deployment: $current_rs_hash"
+
+  local old_rs=$(get_old_replicasets "$current_rs_hash")
+
+  if [ -z "$old_rs" ]; then
+    log "Nenhum ReplicaSet antigo encontrado para remoção."
+  else
+    for rs in $old_rs; do
+      delete_replicaset "$rs"
+    done
+  fi
+}
+
 force_delete_old_replicasets() {
   log "Verificando ReplicaSets antigos para remoção forçada..."
 
-  local current_rs_hash
-  current_rs_hash=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.template.metadata.labels.pod-template-hash}')
-
-  local old_rs
-  old_rs=$(kubectl get rs -n "$NAMESPACE" -l app="$DEPLOYMENT_NAME" -o json | \
-    jq -r --arg current "$current_rs_hash" '.items[] | select(.metadata.labels."pod-template-hash" != $current) | .metadata.name')
+  local current_rs_hash=$(get_current_rs_hash)
+  local old_rs=$(get_old_replicasets "$current_rs_hash")
 
   for rs in $old_rs; do
     log "Forçando deleção do ReplicaSet antigo: $rs"
-    kubectl delete rs "$rs" -n "$NAMESPACE" --grace-period=0 --force || \
-      log "Erro ao forçar deleção do ReplicaSet $rs"
+    delete_replicaset "$rs"
   done
   sleep 10
 }
@@ -181,9 +210,9 @@ atualizar_versao_gitlab() {
     -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/image\",\"value\":\"${new_image}\"}]" || 
     error "Falha ao aplicar nova versão"
 
-  force_delete_old_replicasets
+  cleanup_old_replicasets
 
-  sleep 5
+  sleep 20
 
   # Aguardar rollout
   log "Aguardando rollout..."
@@ -192,9 +221,6 @@ atualizar_versao_gitlab() {
     kubectl rollout undo deployment/"$DEPLOYMENT_NAME" -n "$NAMESPACE" || error "Rollback falhou"
     error "Rollback executado após falha no rollout"
   fi
-
-  # Limpar ReplicaSets antigos
-  cleanup_old_replicasets
 
   # Verificar e aguardar novo pod
   local new_pod=$(get_gitlab_pod)
@@ -206,30 +232,6 @@ atualizar_versao_gitlab() {
 
   success "Upgrade para $version concluído com sucesso."
   return 0
-}
-
-cleanup_old_replicasets() {
-  log "Verificando e removendo ReplicaSets antigos..."
-
-  # Obter o hash atual do deployment
-  local current_rs_hash
-  current_rs_hash=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.template.metadata.labels.pod-template-hash}')
-  log "Hash atual do deployment: $current_rs_hash"
-
-  # Listar e filtrar ReplicaSets antigos
-  local old_rs
-  old_rs=$(kubectl get rs -n "$NAMESPACE" -l app="$DEPLOYMENT_NAME" -o json | \
-    jq -r --arg current "$current_rs_hash" '.items[] | select(.metadata.labels."pod-template-hash" != $current) | .metadata.name')
-
-  if [ -z "$old_rs" ]; then
-    log "Nenhum ReplicaSet antigo encontrado para remoção."
-  else
-    for rs in $old_rs; do
-      log "Deletando ReplicaSet antigo: $rs"
-      kubectl delete rs "$rs" -n "$NAMESPACE" --grace-period=0 --force || \
-        log "Falha ao deletar ReplicaSet $rs"
-    done
-  fi
 }
 
 
@@ -270,4 +272,3 @@ check_pod_structure() {
   log "Containers no pod: $(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.spec.containers[*].name}')"
   log "Imagem: $(kubectl get pod "$pod" -n "$NAMESPACE" -o jsonpath='{.spec.containers[*].image}')"
 }
-
