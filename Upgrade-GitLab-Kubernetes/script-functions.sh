@@ -161,6 +161,7 @@ force_delete_old_replicasets() {
     kubectl delete rs "$rs" -n "$NAMESPACE" --grace-period=0 --force || \
       log "Erro ao forçar deleção do ReplicaSet $rs"
   done
+  sleep 10
 }
 
 atualizar_versao_gitlab() {
@@ -182,7 +183,7 @@ atualizar_versao_gitlab() {
 
   force_delete_old_replicasets
 
-  sleep 10
+  sleep 5
 
   # Aguardar rollout
   log "Aguardando rollout..."
