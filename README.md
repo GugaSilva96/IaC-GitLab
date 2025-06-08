@@ -1,4 +1,4 @@
-# GugaSilva96/IaC-GitLab
+# IaC-GitLab
 
 ## 🚀 Sobre este Repositório
 
